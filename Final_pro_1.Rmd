@@ -1,0 +1,116 @@
+---
+title: "Final Project"
+author: "Geovanni Herrera"
+date: "September 4th 2016"
+output: html_document
+---
+
+#Practical Machine Learning - Data Science Specialization
+
+###1. Background:
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+###2. Instructions: 
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. We may use any of the other variables to predict with. We should create a report describing how you built our model, how we use cross validation, what we think the expected out of sample error is, and why we made our choices. 
+
+#3. Process
+###Data Downloading
+Before computing this code, I realized the data has several missing values, spaces and Excel's zero divition. In order to get rid of these observations I set the function read.cvs with the parameter na.strings=("NA","#DIV/0!",""). Then, it could be easier to get rid of the NAs. 
+```{r}
+tra<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+tes<-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+training <- read.csv(tra, na.strings=c("NA","#DIV/0!",""),  sep=",", stringsAsFactors = F)
+testing <-read.csv(tes, na.strings=c("NA","#DIV/0!",""),  sep=",", stringsAsFactors = F)
+```
+
+###Data Cleansing
+Then, the following code counts the number of observations that can have zero divition and spaces. 
+```{r}
+sum(training=='#DIV/0', na.rm=TRUE)
+sum(training=='', na.rm=TRUE)
+sum(testing=='#DIV/0', na.rm=TRUE)
+sum(testing=='', na.rm=TRUE)
+```
+As you can see, there is no DIV/0 or spaces in our data.
+
+
+###Data Partition
+I divided the data partition into training and testing sets. 
+```{r}
+library(caret)
+set.seed(1012)
+inTrain<-createDataPartition(training$classe, p=0.7, list=F)
+Training<-training[inTrain,]
+Testing<-training[-inTrain,]
+```
+
+###Non zero variables. 
+Some variables does not have variability, then I do not have to consider them in the data. I use the function nearZeroVar. Then I applied it to the training data. 
+```{r}
+nz<-nearZeroVar(Training)
+Training<-Training[,-nz]
+Testing<-Testing[,-nz]
+
+
+```
+
+Once I have all the observations in terms of NA, I can get rid of variables that do not have any observations. 
+```{r}
+Training<-Training[ , colSums(is.na(Training)) == 0]
+Testing<-Testing[ , colSums(is.na(Testing)) == 0]
+                  
+```
+
+Then, I checked the pre-final data set. I realized the data has variables that can affect the predictions. These are cathegorical variables. They are from column 1 to 5.  
+```{r}
+Training<-Training[,-c(1,2,3,4,5)]
+Testing<-Testing[,-c(1,2,3,4,5)]
+names(Training)
+
+```
+
+###Decision Tree
+The first model I try is a Decision Tree. It is impertaive to call the rpart package. 
+```{r}
+#Decision Tree
+library(rpart)
+mod.Tree<-train(classe~.,method="rpart", data=Training)
+library(rattle)
+fancyRpartPlot(mod.Tree$finalModel)
+mod.tree.predict<-predict(mod.Tree, Testing)
+
+```
+Then, I calculated the accuracy.
+```{r}
+confusionMatrix(mod.tree.predict, Testing$classe)$overall[1]
+
+
+```
+As you can see the accuracy is low, almost 50-50. Then it is important to try another algorithm. As it was mentioned at the Leek's class, one of the most accurate algorothims is Random Forest. 
+
+###Random Forest
+
+```{r}
+set.seed(1012)
+trcr <- trainControl(method="boot", number=2, verboseIter=FALSE)
+mod.RF <- train(classe~ ., data=Training, method="rf", trControl = trcr)
+mod.RF$finalModel
+mod.RF.predict<-predict(mod.RF, Testing)
+
+```
+
+Then I calculated the Random Forest accuracy. 
+```{r}
+confusionMatrix(mod.RF.predict, Testing$classe)$overall[1]
+
+
+```
+As you can see it is 100% accurate. Then it can be a good approach to apply this model to the test data.
+The following code shows the 20 results of the test data. 
+```{r}
+pred<-predict(mod.RF, newdata=testing)
+print(pred)
+```
+
+
